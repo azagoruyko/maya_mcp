@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maya-mcp"
+version = "0.1.0"
+description = "Compact MCP bridge for inspecting and editing Autodesk Maya scenes"
+requires-python = ">=3.10"
+dependencies = ["fastmcp>=2.0", "pyzmq>=25"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+maya-mcp = "maya_mcp.mcp_server:main"
+
+[tool.setuptools.packages.find]
+include = ["maya_mcp*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
