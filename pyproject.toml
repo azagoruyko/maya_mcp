@@ -18,5 +18,8 @@ maya-mcp = "maya_mcp.mcp_server:main"
 [tool.setuptools.packages.find]
 include = ["maya_mcp*"]
 
+[tool.setuptools.package-data]
+maya_mcp = ["ai_workflow.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

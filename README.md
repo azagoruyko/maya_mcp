@@ -1,91 +1,37 @@
 # Maya MCP
 
-A compact MCP server for inspecting and editing a running Autodesk Maya scene.
-The integration has two local processes:
+Maya MCP connects an AI client to an open Autodesk Maya scene. It has two
+parts: an external MCP server and a small bridge running inside Maya.
 
-```text
-MCP client --stdio--> maya_mcp.mcp_server --ZMQ REQ/REP--> Maya bridge
-```
+## Requirements
 
-The MCP adapter currently exposes six tools for the scene-project experiment:
+- Python 3.10 or newer for the external MCP server.
+- Autodesk Maya with `pyzmq` installed in Maya's Python environment.
+- Rig Builder and RigSystem available in Maya for reusable, module-based rig
+  workflows. Scene inspection and direct MCP tools can be used without them.
 
-- `scene_context`
-- `scene_naming`
-- `scene_hierarchy`
-- `scene_connections`
-- `viewport_capture`
-- `maya_command`
+## Setup
 
-The bridge still contains the earlier query, inspect, graph, patch, and verify
-handlers, but they are intentionally not registered as MCP tools while the new
-workflow is being tested.
-
-Heavy geometry values such as mesh points, topology arrays, skin weights, and
-blend-shape deltas are deliberately omitted.
-
-`viewport_capture` returns a PNG from the active model panel or a specified
-camera directly as MCP image content. It does not keep the temporary image on
-disk. Width and height must be divisible by four and between 64 and 2048.
-
-`scene_naming` provides a cheap first pass over prefixes, suffixes, likely
-families, and NURBS control candidates. `scene_hierarchy` returns a compact
-text DAG tree without shapes by default, so node identity metadata is not
-repeated for every line. It shows transforms, joints, and IK handles by
-default; pass `include_types: ["*"]` to include constraints and every DAG type.
-
-`scene_connections` follows inputs, outputs, or both from focused nodes and
-plugs. Connections are split by direction and keep exact plugs while placing
-the node type directly beside each endpoint:
-
-```yaml
-inputs:
-  - source (joint): M_spine_5_joint.worldMatrix
-    destination (parentConstraint): L_arm_options_control_parentConstraint1.targetParentMatrix
-```
-
-Start with `depth: 1`; expand only when the next part of the graph is unclear.
-Use `include_types` or `exclude_types` to focus the result without requesting a
-flat dump of the entire DG.
-
-`maya_command` calls one native `maya.cmds` command with JSON positional and
-keyword arguments, or accepts a `commands` list for a batch. The complete call
-or batch runs in one undo chunk and is rolled back when Maya raises an error.
-
-
-## Install the external MCP server
-
-Create a normal virtual environment outside Maya:
+Install the MCP server in a regular Python environment outside Maya:
 
 ```powershell
-cd D:\github\maya_mcp
+cd D:\path\to\maya_mcp
 py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv\Scripts\python.exe -m pip install -e .
 ```
 
-Configure the IDE to run:
+In your MCP client, configure the server to run:
 
 ```text
-D:\github\maya_mcp\.venv\Scripts\python.exe
+D:\path\to\maya_mcp\.venv\Scripts\python.exe -m maya_mcp.mcp_server
 ```
 
-with arguments:
-
-```text
--m maya_mcp.mcp_server
-```
-
-The MCP process communicates only through stdout/stdin. Diagnostic output must
-therefore go to stderr or a log file.
-
-## Start the bridge in Maya
-
-The Maya Python environment needs access to `pyzmq`. Then run this in Maya's
-Python Script Editor:
+In Maya's Python Script Editor, start the bridge:
 
 ```python
 import sys
 
-project_path = r"D:\github\maya_mcp"
+project_path = r"D:\path\to\maya_mcp"
 if project_path not in sys.path:
     sys.path.insert(0, project_path)
 
@@ -93,21 +39,27 @@ import maya_mcp
 maya_mcp.start()
 ```
 
-The default endpoint is `tcp://127.0.0.1:51608`. Override it in both processes
-with `MAYA_MCP_ENDPOINT`. An optional matching `MAYA_MCP_TOKEN` can protect the
-local endpoint.
+The default local endpoint is `tcp://127.0.0.1:51608`. Set the same
+`MAYA_MCP_ENDPOINT` in both environments to change it. Optionally, set the same
+`MAYA_MCP_TOKEN` in both environments to protect the connection. Stop the
+bridge from Maya with `maya_mcp.stop()`.
 
-Stop the bridge with:
+## Using Maya MCP
 
-```python
-maya_mcp.stop()
-```
+The server provides these tools:
 
-## Development checks
+- `scene_context` — current scene, selection, roots, units, references, and counts.
+- `scene_naming` — naming patterns and likely control families.
+- `scene_hierarchy` — a focused DAG hierarchy.
+- `scene_connections` — connections between nodes and attributes.
+- `viewport_capture` — an image of the Maya viewport.
+- `maya_command` — a low-level fallback for native `maya.cmds` calls.
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-```
+For rig edits, the intended workflow is to find or compose modules in Rig
+Builder and use RigSystem's high-level APIs from those modules. Inspect and
+verify the scene with Maya MCP before and after running a workflow. Do not guess
+ambiguous inputs such as edge loops or guide curves; provide them as module
+inputs and run the module after they are specified.
 
-These tests cover the external transport and Maya-independent helpers. The Maya
-scene operations require an integration test in a running Maya process.
+AI workflow guidance is included in the server instructions and available as
+the `maya://ai-workflow` MCP resource.

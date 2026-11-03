@@ -1,6 +1,7 @@
 """External stdio MCP adapter for the Maya ZMQ bridge."""
 
 import base64
+from importlib.resources import files
 from typing import Any, Literal
 
 from fastmcp import FastMCP
@@ -9,31 +10,24 @@ from fastmcp.utilities.types import Image
 from .client import MayaClient
 
 
-MAYA_INSTRUCTIONS = """Treat a Maya scene as a structured project, not as one flat node graph.
-Analyze progressively and keep every request scoped to the part being investigated:
-1. Call scene_context once for scene state, selection, roots, references, and scale.
-2. Use scene_naming to discover naming conventions and likely rig modules. Treat names as hypotheses.
-3. Use viewport_capture when placement, shape, or visual grouping matters.
-4. Read scene_hierarchy only for relevant roots. Start shallow and expand a module only when needed.
-5. For a control rig, follow controls through scene_connections to constraints, utilities, IK/FK chains,
-   and finally the joints or transforms they drive. Confirm naming guesses with hierarchy and connections.
-6. Treat the driven skeleton as the boundary between the control rig and deformation rig.
-7. Inspect deformation only when relevant: geometry, ordered deformer history, skin influences or blend
-   targets, then low-level utility nodes. Do not request weights, deltas, large arrays, or a whole graph
-   unless the task specifically requires them.
-8. Prefer scene_connections over raw listConnections. Start with depth=1 and exact plugs; increase depth
-   or filter node types only when the next relationship is unclear.
-9. Use maya_command for native Maya operations. Batch related commands so one logical edit is one call
-   and one undo step. Do not modify unrelated rig modules.
-10. After edits, report what changed and whether the Maya scene is modified or unsaved.
-Keep outputs and requests compact. Prefer names, node types, exact plugs, and focused evidence over broad dumps."""
+AI_WORKFLOW = files("maya_mcp").joinpath("ai_workflow.md").read_text(encoding="utf-8")
 
 
 mcp = FastMCP(
     "Maya",
-    instructions=MAYA_INSTRUCTIONS,
+    instructions=AI_WORKFLOW,
 )
 _client = MayaClient()
+
+
+@mcp.resource(
+    "maya://ai-workflow",
+    name="Maya AI workflow",
+    description="Guidance for AI scene inspection and Rig Builder/RigSystem workflows.",
+)
+def maya_ai_workflow() -> str:
+    """Provide the AI workflow guidance as an MCP resource."""
+    return AI_WORKFLOW
 
 
 @mcp.tool
